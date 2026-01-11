@@ -1,0 +1,218 @@
+syntax = "proto3";
+package automation;
+
+option go_package = "furio_sdk/proto";
+
+// Service for task type registration
+service TaskRegistryService {
+    rpc RegisterTaskType(RegisterTaskTypeRequest) returns (RegisterTaskTypeResponse);
+    rpc GetTaskType(GetTaskTypeRequest) returns (GetTaskTypeResponse);
+    rpc ListTaskTypes(ListTaskTypesRequest) returns (ListTaskTypesResponse);
+}
+
+// Service for worker registration and task polling - external SDKs call this
+service WorkerService {
+    rpc RegisterWorker(RegisterWorkerRequest) returns (RegisterWorkerResponse);
+    rpc UnregisterWorker(UnregisterWorkerRequest) returns (UnregisterWorkerResponse);
+    rpc PollTask(PollTaskRequest) returns (TaskRequest);
+    rpc CompleteTask(TaskResult) returns (CompleteTaskResponse);
+
+    rpc StartLiveWorkflow(StartLiveWorkflowRequest) returns (StartLiveWorkflowResponse);
+    rpc ExecuteTasks(ExecuteTasksRequest) returns (ExecuteTasksResponse);
+    rpc GetTaskResults(GetTaskResultsRequest) returns (GetTaskResultsResponse);
+    rpc CompleteWorkflow(CompleteWorkflowRequest) returns (CompleteWorkflowResponse);
+
+    // Failure notifications - streaming connection for receiving fatal workflow failures
+    rpc SubscribeFailures(SubscribeFailuresRequest) returns (stream WorkflowFailureNotification);
+}
+
+// Worker registration messages
+message RegisterWorkerRequest {
+    repeated string task_types = 1;
+    int32 max_concurrent_tasks = 2;
+    map<string, string> metadata = 3;
+}
+
+message PollTaskRequest {
+    int64 node_id = 1;
+    repeated string task_types = 2;
+    int32 timeout_ms = 3;
+}
+
+// Response for task completion
+message CompleteTaskResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message RegisterWorkerResponse {
+    bool success = 1;
+    string message = 2;
+    int64 node_id = 3;
+    bool redirect_required = 4;
+    repeated string router_endpoints = 5;
+}
+
+message UnregisterWorkerRequest {
+    int64 node_id = 1;
+}
+
+message UnregisterWorkerResponse {
+    bool success = 1;
+}
+// Task type definition
+message TaskTypeSchema {
+    string name = 1;
+    string description = 2;
+    bytes input_schema = 3;
+    bytes output_schema = 4;
+    int32 default_timeout_ms = 5;
+    string category = 6;
+    string handler = 7;
+    string icon = 8;
+    string color = 9;
+    bool is_active = 10;
+}
+
+message RegisterTaskTypeRequest {
+    TaskTypeSchema task_type = 1;
+}
+
+message RegisterTaskTypeResponse {
+    bool success = 1;
+    string message = 2;
+    int64 task_type_id = 3;
+}
+
+message GetTaskTypeRequest {
+    string name = 1;
+}
+
+message GetTaskTypeResponse {
+    bool found = 1;
+    TaskTypeSchema task_type = 2;
+}
+
+message ListTaskTypesRequest {
+    int32 limit = 1;
+    int32 offset = 2;
+}
+
+message ListTaskTypesResponse {
+    repeated TaskTypeSchema task_types = 1;
+    int32 total = 2;
+}
+
+message TaskRequest {
+    int64 task_id = 1;
+    string task_type = 2;
+    bytes input = 3;
+    int64 workflow_id = 4;
+    int32 stage_index = 5;
+    int32 timeout_ms = 6;
+    map<string, string> metadata = 7;
+    int64 publisher_router_id = 8;
+    int64 publisher_worker_id = 9;
+}
+
+message TaskResult {
+    int64 task_id = 1;
+    bool success = 2;
+    bytes output = 3;
+    string error = 4;
+    int64 execution_time_ms = 5;
+    int64 workflow_id = 6;
+    int64 publisher_router_id = 7;
+    int64 publisher_worker_id = 8;
+}
+
+message TaskSubmit {
+    string task_type = 1;
+    bytes input = 2;
+    int32 timeout_ms = 3;
+    int32 stage_index = 4;
+}
+
+message TaskSubmitResult {
+    int64 task_id = 1;
+    bool success = 2;
+    string error = 3;
+}
+
+message ExecuteTasksRequest {
+    int64 workflow_id = 1;
+    int64 node_id = 2;
+    repeated TaskSubmit tasks = 3;
+}
+
+message ExecuteTasksResponse {
+    repeated TaskSubmitResult results = 1;
+}
+
+message TaskResultQuery {
+    int64 task_id = 1;
+}
+
+message TaskResultItem {
+    int64 task_id = 1;
+    bool ready = 2;
+    bool success = 3;
+    bytes output = 4;
+    string error = 5;
+}
+
+message GetTaskResultsRequest {
+    int64 workflow_id = 1;
+    int32 timeout_ms = 2;
+    repeated TaskResultQuery tasks = 3;
+}
+
+message GetTaskResultsResponse {
+    repeated TaskResultItem results = 1;
+}
+
+message StartLiveWorkflowRequest {
+    int64 node_id = 1;
+    bool failure_callback = 2;
+    string workflow_name = 3;
+    int32 timeout_ms = 4;
+}
+
+message StartLiveWorkflowResponse {
+    bool success = 1;
+    int64 workflow_id = 2;
+    int64 publisher_router_id = 3;
+    string error = 4;
+}
+
+message CompleteWorkflowRequest {
+    int64 workflow_id = 1;
+    bool success = 2;
+    string error = 3;
+}
+
+message CompleteWorkflowResponse {
+    bool success = 1;
+}
+
+message SubscribeFailuresRequest {
+    int64 node_id = 1;
+}
+
+message WorkflowFailureNotification {
+    int64 workflow_id = 1;
+    int64 task_id = 2;
+    string task_type = 3;
+    string error = 4;
+    FailureType failure_type = 5;
+    int32 retry_attempts = 6;
+    int64 timestamp = 7;
+}
+
+enum FailureType {
+    FAILURE_TYPE_UNKNOWN = 0;
+    FAILURE_TYPE_TASK_EXHAUSTED_RETRIES = 1;
+    FAILURE_TYPE_ROUTER_UNAVAILABLE = 2;
+    FAILURE_TYPE_LEADER_UNAVAILABLE = 3;
+    FAILURE_TYPE_SYSTEM_ERROR = 4;
+}
