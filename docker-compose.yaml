@@ -1,0 +1,38 @@
+version: '3.8'
+
+x-worker: &worker-base
+  build: .
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  restart: unless-stopped
+
+services:
+  worker-1:
+    <<: *worker-base
+    container_name: furio-worker-1
+    environment:
+      - FURIO_SERVER=host.docker.internal:9090
+      - WORKER_ID=worker-1
+      - HTTP_PORT=8080
+    ports:
+      - "8081:8080"
+
+  worker-2:
+    <<: *worker-base
+    container_name: furio-worker-2
+    environment:
+      - FURIO_SERVER=host.docker.internal:9090
+      - WORKER_ID=worker-2
+      - HTTP_PORT=8080
+    ports:
+      - "8082:8080"
+
+  worker-3:
+    <<: *worker-base
+    container_name: furio-worker-3
+    environment:
+      - FURIO_SERVER=host.docker.internal:9090
+      - WORKER_ID=worker-3
+      - HTTP_PORT=8080
+    ports:
+      - "8083:8080"
